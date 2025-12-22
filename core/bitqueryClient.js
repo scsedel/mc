@@ -5,15 +5,11 @@ const BITQUERY_URL = 'https://streaming.bitquery.io/graphql';
 // Query di test: ultimi token Pump.fun creati (pochi campi base)
 const TEST_QUERY = `
   query TestNewPumpfunTokens {
-    Solana(dataset: realtime) {
+    Solana {
       TokenSupplyUpdates(
         limit: { count: 5 }
         orderBy: { descending: Block_Time }
         where: {
-          Instruction: {
-            Program: { Name: { is: "pump" } }
-            Method: { is: "create" }
-          }
           Transaction: { Result: { Success: true } }
         }
       ) {
@@ -24,19 +20,18 @@ const TEST_QUERY = `
           Program {
             Address
             Name
-            Method
           }
         }
         TokenSupplyUpdate {
+          PostBalance
           Currency {
             MintAddress
             Name
             Symbol
-            MetadataAddress
             Uri
             UpdateAuthority
+            ProgramAddress
           }
-          PostBalance
         }
         Transaction {
           Signer
@@ -85,7 +80,7 @@ async function testNewPumpfunTokens() {
         symbol: u.TokenSupplyUpdate?.Currency?.Symbol,
         metadataUri: u.TokenSupplyUpdate?.Currency?.Uri,
         programName: u.Instruction?.Program?.Name,
-        programMethod: u.Instruction?.Program?.Method,
+        programAddress: u.Instruction?.Program?.Address,
     }));
 
     return tokens;
