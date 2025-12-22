@@ -10,6 +10,11 @@ const TEST_QUERY = `
         limit: { count: 5 }
         orderBy: { descending: Block_Time }
         where: {
+          Instruction: {
+            Program: {
+              Address: { is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" }
+            }
+          }
           Transaction: { Result: { Success: true } }
         }
       ) {
