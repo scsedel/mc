@@ -236,8 +236,8 @@ async function updateCandidatesFeed() {
     try {
         console.log('🔄 Aggiornamento feed candidati...');
 
-        // 1) Nuovi token Pump.fun (già filtrati per Age < 1h)
         const tokens = await testNewPumpfunTokens();
+        console.log('📥 Token Pump.fun (Age < 1h):', tokens.length);
 
         const results = [];
 
@@ -245,19 +245,25 @@ async function updateCandidatesFeed() {
             const mint = t.mintAddress;
             const dev = t.devAddress;
 
-            if (!mint || !dev) continue;
+            console.log('➡️  Valuto token:', mint, 'dev:', dev);
+
+            if (!mint || !dev) {
+                console.log('   ⛔ mint o dev mancante, salto');
+                continue;
+            }
 
             try {
-                // 2) Statistiche Pump.fun: bonding curve, liquidity, ecc.
                 const stats = await getPumpfunTokenStats(mint);
+                console.log('   📊 Stats:', {
+                    bondingCurve: stats.bondingCurveProgress,
+                });
 
-                // 3) Volume 24h USD
                 const vol = await getPumpfunTokenVolume(mint);
+                console.log('   💰 Volume24hUsd:', vol.volume24hUsd);
 
-                // 4) Saldo dev
                 const devBalance = await getDevBalance(mint, dev);
+                console.log('   👤 DevBalance:', devBalance);
 
-                // 5) Applica filtri
                 const bondingCurve = stats.bondingCurveProgress ?? 0;
                 const volume24hUsd = vol.volume24hUsd ?? 0;
 
@@ -265,6 +271,8 @@ async function updateCandidatesFeed() {
                 const bondingOk = bondingCurve > 95.3;
                 const volumeOk = volume24hUsd > 59000;
                 const devSoldOut = devBalance === 0;
+
+                console.log('   ✅ Filtri:', { ageOk, bondingOk, volumeOk, devSoldOut });
 
                 if (ageOk && bondingOk && volumeOk && devSoldOut) {
                     results.push({
@@ -276,7 +284,6 @@ async function updateCandidatesFeed() {
                         bondingCurveProgress: bondingCurve,
                         volume24hUsd,
                         devBalance,
-                        // campi extra utili
                         priceUsd: stats.priceUsd ?? null,
                         liquidityUsd: stats.liquidityUsd ?? null,
                         metadataUri: t.metadataUri ?? null,
@@ -284,8 +291,7 @@ async function updateCandidatesFeed() {
                     });
                 }
             } catch (innerErr) {
-                console.error(`Errore valutando token ${mint}:`, innerErr.message);
-                // Continua con il prossimo token
+                console.error(`   ❌ Errore valutando token ${mint}:`, innerErr.message);
             }
         }
 
@@ -294,7 +300,7 @@ async function updateCandidatesFeed() {
 
         console.log(`✅ Feed aggiornato, candidati: ${currentCandidates.length}`);
     } catch (error) {
-        console.error('❌ Errore aggiornamento feed candidati:', error.message);
+        console.error('❌ Errore aggiornamento feed candidati (outer):', error.message);
     }
 }
 
