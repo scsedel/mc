@@ -50,29 +50,22 @@ const TEST_QUERY = `
 const STATS_QUERY = `
   query PumpfunTokenStats($mint: String!) {
     Solana {
-      PumpFunTokens(
+      PumpFunMarketcap(
         where: { MintAddress: { is: $mint } }
         limit: { count: 1 }
       ) {
         MintAddress
         Name
         Symbol
-        MarketCap {
-          PriceInUSD
-          MarketCapInUSD
-          Volume24hInUSD
-        }
-        Liquidity {
-          LiquidityInUSD
-        }
-        BondingCurve {
-          BondingCurveProgress
-        }
+        PriceInUSD
+        MarketCapInUSD
+        Volume24hInUSD
+        LiquidityInUSD
+        BondingCurveProgress
       }
     }
   }
 `;
-
 
 async function testNewPumpfunTokens() {
     const apiToken = process.env.BITQUERY_V2_TOKEN;
@@ -163,24 +156,20 @@ async function getPumpfunTokenStats(mintAddress) {
         throw new Error(`Bitquery errors: ${JSON.stringify(json.errors)}`);
     }
 
-    const token = json.data?.Solana?.PumpFunTokens?.[0];
+    const token = json.data?.Solana?.PumpFunMarketcap?.[0];
     if (!token) {
-        throw new Error('Nessun dato trovato per questo mint (non sembra un token Pump.fun)');
+        throw new Error('Nessun dato trovato per questo mint (non sembra un token Pump.fun o manca ancora marketcap)');
     }
-
-    const market = token.MarketCap || {};
-    const liq = token.Liquidity || {};
-    const curve = token.BondingCurve || {};
 
     return {
         mintAddress: token.MintAddress,
         name: token.Name,
         symbol: token.Symbol,
-        priceUsd: market.PriceInUSD ?? null,
-        marketCapUsd: market.MarketCapInUSD ?? null,
-        volume24hUsd: market.Volume24hInUSD ?? null,
-        liquidityUsd: liq.LiquidityInUSD ?? null,
-        bondingCurveProgress: curve.BondingCurveProgress ?? null,
+        priceUsd: token.PriceInUSD ?? null,
+        marketCapUsd: token.MarketCapInUSD ?? null,
+        volume24hUsd: token.Volume24hInUSD ?? null,
+        liquidityUsd: token.LiquidityInUSD ?? null,
+        bondingCurveProgress: token.BondingCurveProgress ?? null,
     };
 }
 
