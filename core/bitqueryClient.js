@@ -5,7 +5,7 @@ const BITQUERY_URL = 'https://streaming.bitquery.io/graphql';
 // Query di test: ultimi token Pump.fun creati (pochi campi base)
 const TEST_QUERY = `
   query TestNewPumpfunTokens {
-    solana {
+    Solana {
       pumpFunTokens(
         orderBy: { descending: block_time }
         limit: { count: 5 }
