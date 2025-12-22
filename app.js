@@ -9,10 +9,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
-// ❌ RIMUOVI QUESTE RIGHE:
-// app.set('view engine', 'ejs');
-// app.set('views', path.join(__dirname, 'views'));
-
 // Pool Supabase
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -90,7 +86,7 @@ app.get('/', async (req, res) => {
     <h2>Test Connessione DB</h2>
     ${dbStatus.success ? `
         <div class="status success">
-            ✅ <strong>CONNESSIONE OK!</strong><br>
+            ✅ <strong>CONNESSIONE VERY OK!</strong><br>
             Tempo server: ${dbStatus.time}<br>
             PostgreSQL: ${dbStatus.pgVersion}<br>
             Token stats: ${dbStatus.tokenStats} righe
