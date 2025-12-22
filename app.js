@@ -299,7 +299,7 @@ async function updateCandidatesFeed() {
 }
 
 // Avvia aggiornamento periodico del feed (ogni 30 secondi, ad esempio)
-const FEED_INTERVAL_MS = 5000;
+const FEED_INTERVAL_MS = 30000;
 
 setInterval(() => {
     updateCandidatesFeed().catch((err) => {
