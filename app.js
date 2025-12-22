@@ -12,6 +12,8 @@ const {
     getPumpfunTokenVolume,
 } = require('./core/bitqueryClient');
 
+const { getDevBalance } = require('./core/devChecker');
+
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -188,6 +190,37 @@ app.get('/api/test-pumpfun-stats', async (req, res) => {
         });
     } catch (error) {
         console.error('Errore test Pumpfun stats:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// Test saldo DEV per un token (usa Helius)
+app.get('/api/test-dev-balance', async (req, res) => {
+    const { mint, dev } = req.query;
+
+    if (!mint || !dev) {
+        return res.status(400).json({
+            success: false,
+            error: 'Parametri "mint" e "dev" obbligatori. Usa ?mint=<mintAddress>&dev=<devAddress>',
+        });
+    }
+
+    try {
+        const balance = await getDevBalance(mint.trim(), dev.trim());
+        const hasSoldAll = balance === 0;
+
+        res.json({
+            success: true,
+            mint: mint.trim(),
+            dev: dev.trim(),
+            devBalance: balance,
+            hasSoldAll,
+        });
+    } catch (error) {
+        console.error('Errore test dev balance:', error.message);
         res.status(500).json({
             success: false,
             error: error.message,
