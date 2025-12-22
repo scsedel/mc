@@ -50,22 +50,68 @@ const TEST_QUERY = `
 const STATS_QUERY = `
   query PumpfunTokenStats($mint: String!) {
     Solana {
-      PumpFunMarketcap(
-        where: { MintAddress: { is: $mint } }
+      DEXPools(
         limit: { count: 1 }
+        orderBy: { descending: Block_Slot }
+        where: {
+          Pool: {
+            Market: {
+              BaseCurrency: {
+                MintAddress: { is: $mint }
+              }
+              QuoteCurrency: {
+                MintAddress: {
+                  in: [
+                    "11111111111111111111111111111111"
+                    "So11111111111111111111111111111111111111112"
+                  ]
+                }
+              }
+            }
+            Dex: {
+              ProgramAddress: {
+                is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+              }
+            }
+          }
+          Transaction: { Result: { Success: true } }
+        }
       ) {
-        MintAddress
-        Name
-        Symbol
-        PriceInUSD
-        MarketCapInUSD
-        Volume24hInUSD
-        LiquidityInUSD
-        BondingCurveProgress
+        Bonding_Curve_Progress_precentage: calculate(
+          expression: "100 - ((($Pool_Base_Balance - 206900000) * 100) / 793100000)"
+        )
+        Pool {
+          Market {
+            BaseCurrency {
+              MintAddress
+              Name
+              Symbol
+            }
+            MarketAddress
+            QuoteCurrency {
+              MintAddress
+              Name
+              Symbol
+            }
+          }
+          Dex {
+            ProtocolName
+            ProtocolFamily
+          }
+          Base {
+            Balance: PostAmount
+          }
+          Quote {
+            PostAmount
+            PriceInUSD
+            PostAmountInUSD
+          }
+        }
       }
     }
   }
 `;
+
 
 async function testNewPumpfunTokens() {
     const apiToken = process.env.BITQUERY_V2_TOKEN;
@@ -156,20 +202,24 @@ async function getPumpfunTokenStats(mintAddress) {
         throw new Error(`Bitquery errors: ${JSON.stringify(json.errors)}`);
     }
 
-    const token = json.data?.Solana?.PumpFunMarketcap?.[0];
-    if (!token) {
-        throw new Error('Nessun dato trovato per questo mint (non sembra un token Pump.fun o manca ancora marketcap)');
+    const tokenPool = json.data?.Solana?.DEXPools?.[0];
+    if (!tokenPool) {
+        throw new Error('Nessun pool Pump.fun trovato per questo mint');
     }
 
+    const pool = tokenPool.Pool;
+    const market = pool.Market;
+    const base = pool.Base;
+    const quote = pool.Quote;
+
     return {
-        mintAddress: token.MintAddress,
-        name: token.Name,
-        symbol: token.Symbol,
-        priceUsd: token.PriceInUSD ?? null,
-        marketCapUsd: token.MarketCapInUSD ?? null,
-        volume24hUsd: token.Volume24hInUSD ?? null,
-        liquidityUsd: token.LiquidityInUSD ?? null,
-        bondingCurveProgress: token.BondingCurveProgress ?? null,
+        mintAddress: market.BaseCurrency?.MintAddress,
+        name: market.BaseCurrency?.Name,
+        symbol: market.BaseCurrency?.Symbol,
+        bondingCurveProgress: tokenPool.Bonding_Curve_Progress_precentage ?? null,
+        baseBalance: base?.Balance ?? null,
+        priceUsd: quote?.PriceInUSD ?? null,
+        liquidityUsd: quote?.PostAmountInUSD ?? null,
     };
 }
 
