@@ -5,17 +5,43 @@ const BITQUERY_URL = 'https://streaming.bitquery.io/graphql';
 // Query di test: ultimi token Pump.fun creati (pochi campi base)
 const TEST_QUERY = `
   query TestNewPumpfunTokens {
-    Solana {
-      pumpFunTokens(
-        orderBy: { descending: block_time }
+    Solana(dataset: realtime) {
+      TokenSupplyUpdates(
         limit: { count: 5 }
+        orderBy: { descending: Block_Time }
+        where: {
+          Instruction: {
+            Program: { Name: { is: "pump" } }
+            Method: { is: "create" }
+          }
+          Transaction: { Result: { Success: true } }
+        }
       ) {
-        tokenAddress: mint
-        name
-        symbol
-        createdAt: block_time
-        devAddress: creator
-        platform: platform
+        Block {
+          Time
+        }
+        Instruction {
+          Program {
+            Address
+            Name
+            Method
+          }
+        }
+        TokenSupplyUpdate {
+          Currency {
+            MintAddress
+            Name
+            Symbol
+            MetadataAddress
+            Uri
+            UpdateAuthority
+          }
+          PostBalance
+        }
+        Transaction {
+          Signer
+          Signature
+        }
       }
     }
   }
@@ -49,7 +75,18 @@ async function testNewPumpfunTokens() {
         throw new Error(`Bitquery errors: ${JSON.stringify(json.errors)}`);
     }
 
-    const tokens = json.data?.Solana?.pumpFunTokens ?? [];
+    const updates = json.data?.Solana?.TokenSupplyUpdates ?? [];
+
+    const tokens = updates.map((u) => ({
+        createdAt: u.Block?.Time,
+        devAddress: u.Transaction?.Signer,
+        mintAddress: u.TokenSupplyUpdate?.Currency?.MintAddress,
+        name: u.TokenSupplyUpdate?.Currency?.Name,
+        symbol: u.TokenSupplyUpdate?.Currency?.Symbol,
+        metadataUri: u.TokenSupplyUpdate?.Currency?.Uri,
+        programName: u.Instruction?.Program?.Name,
+        programMethod: u.Instruction?.Program?.Method,
+    }));
 
     return tokens;
 }
