@@ -112,6 +112,28 @@ const STATS_QUERY = `
   }
 `;
 
+const VOLUME_QUERY = `
+  query PumpfunTokenVolume24h($mint: String!) {
+    Solana {
+      DEXTradeByTokens(
+        where: {
+          Trade: {
+            Currency: { MintAddress: { is: $mint } }
+            Dex: {
+              ProgramAddress: {
+                is: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+              }
+            }
+          }
+          Block: { Time: { since_relative: { hours_ago: 24 } } }
+          Transaction: { Result: { Success: true } }
+        }
+      ) {
+        Volume24hUsd: sum(of: Trade_Side_AmountInUSD)
+      }
+    }
+  }
+`;
 
 async function testNewPumpfunTokens() {
     const apiToken = process.env.BITQUERY_V2_TOKEN;
@@ -223,7 +245,49 @@ async function getPumpfunTokenStats(mintAddress) {
     };
 }
 
+async function getPumpfunTokenVolume(mintAddress) {
+    const apiToken = process.env.BITQUERY_V2_TOKEN;
+    if (!apiToken) {
+        throw new Error('BITQUERY_V2_TOKEN non impostata nelle variabili di ambiente');
+    }
+    if (!mintAddress) {
+        throw new Error('mintAddress è obbligatorio');
+    }
+
+    const response = await fetch(BITQUERY_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({
+            query: VOLUME_QUERY,
+            variables: { mint: mintAddress },
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Bitquery HTTP ${response.status}: ${text}`);
+    }
+
+    const json = await response.json();
+
+    if (json.errors && json.errors.length) {
+        throw new Error(`Bitquery errors: ${JSON.stringify(json.errors)}`);
+    }
+
+    const row = json.data?.Solana?.DEXTradeByTokens?.[0];
+
+    const volume24hUsd = row?.Volume24hUsd ?? 0;
+
+    return {
+        volume24hUsd,
+    };
+}
+
 module.exports = {
     testNewPumpfunTokens,
     getPumpfunTokenStats,
+    getPumpfunTokenVolume,
 };

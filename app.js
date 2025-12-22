@@ -6,7 +6,11 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { testNewPumpfunTokens, getPumpfunTokenStats } = require('./core/bitqueryClient');
+const {
+    testNewPumpfunTokens,
+    getPumpfunTokenStats,
+    getPumpfunTokenVolume,
+} = require('./core/bitqueryClient');
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -170,10 +174,17 @@ app.get('/api/test-pumpfun-stats', async (req, res) => {
     }
 
     try {
-        const stats = await getPumpfunTokenStats(mint.trim());
+        const [stats, volume] = await Promise.all([
+            getPumpfunTokenStats(mint.trim()),
+            getPumpfunTokenVolume(mint.trim()),
+        ]);
+
         res.json({
             success: true,
-            stats,
+            stats: {
+                ...stats,
+                volume24hUsd: volume.volume24hUsd,
+            },
         });
     } catch (error) {
         console.error('Errore test Pumpfun stats:', error.message);
