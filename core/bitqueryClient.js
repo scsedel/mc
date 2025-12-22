@@ -77,16 +77,29 @@ async function testNewPumpfunTokens() {
 
     const updates = json.data?.Solana?.TokenSupplyUpdates ?? [];
 
-    const tokens = updates.map((u) => ({
-        createdAt: u.Block?.Time,
-        devAddress: u.Transaction?.Signer,
-        mintAddress: u.TokenSupplyUpdate?.Currency?.MintAddress,
-        name: u.TokenSupplyUpdate?.Currency?.Name,
-        symbol: u.TokenSupplyUpdate?.Currency?.Symbol,
-        metadataUri: u.TokenSupplyUpdate?.Currency?.Uri,
-        programName: u.Instruction?.Program?.Name,
-        programAddress: u.Instruction?.Program?.Address,
-    }));
+    const now = new Date();
+
+    const tokens = updates
+        .map((u) => {
+            const createdAtStr = u.Block?.Time;
+            const createdAt = createdAtStr ? new Date(createdAtStr) : null;
+            const ageMs = createdAt ? now - createdAt : null;
+            const ageMinutes = ageMs != null ? ageMs / 60000 : null;
+
+            return {
+                createdAt: createdAtStr,
+                ageMinutes,
+                devAddress: u.Transaction?.Signer,
+                mintAddress: u.TokenSupplyUpdate?.Currency?.MintAddress,
+                name: u.TokenSupplyUpdate?.Currency?.Name,
+                symbol: u.TokenSupplyUpdate?.Currency?.Symbol,
+                metadataUri: u.TokenSupplyUpdate?.Currency?.Uri,
+                programName: u.Instruction?.Program?.Name,
+                programAddress: u.Instruction?.Program?.Address,
+            };
+        })
+        // Filtra solo token con Age < 60 minuti
+        .filter((t) => t.ageMinutes != null && t.ageMinutes < 60);
 
     return tokens;
 }
