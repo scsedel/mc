@@ -6,24 +6,20 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.static('public'));
 app.use(express.json());
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 
-// Pool Supabase con DATABASE_URL
+// Pool Supabase
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
-// Test connessione DB
+// Test DB
 async function testDbConnection() {
     try {
         const res = await pool.query('SELECT NOW() as time, version() as pg_version');
         const stats = await pool.query('SELECT COUNT(*) as count FROM token_stats');
-
         return {
             success: true,
             time: res.rows[0].time,
@@ -40,33 +36,109 @@ async function testDbConnection() {
     }
 }
 
-// Endpoint test DB
+// API endpoints
 app.get('/api/test-db', async (req, res) => {
     const result = await testDbConnection();
     res.json(result);
 });
 
-// Endpoint restart app (Plesk/Phusion Passenger)
 app.post('/api/restart-app', (req, res) => {
     try {
-        // Crea tmp/restart.txt per triggerare restart Plesk
         const restartFile = path.join(__dirname, 'tmp', 'restart.txt');
         fs.mkdirSync(path.dirname(restartFile), { recursive: true });
         fs.writeFileSync(restartFile, new Date().toISOString());
-
-        res.json({ success: true, message: 'App riavviata! Le variabili d\'ambiente sono state refreshate.' });
+        res.json({ success: true, message: 'App riavviata! Variabili refreshate.' });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Pagina principale
+// Pagina principale HTML puro
 app.get('/', async (req, res) => {
     const dbStatus = await testDbConnection();
-    res.render('index', { dbStatus });
+
+    res.send(`
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Supabase & Refresh Env Plesk</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .status { padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .env-info { background: #e9ecef; padding: 15px; border-radius: 6px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Supabase DB & Refresh Variabili Plesk</h1>
+    
+    <div class="env-info">
+        <strong>DATABASE_URL impostata:</strong> ${dbStatus.databaseUrlSet ? '✅ SÌ' : '❌ NO'}<br>
+        <small>Se NO, aggiungi DATABASE_URL in Plesk > Node.js > Custom Environment Variables</small>
+    </div>
+
+    <h2>Test Connessione DB</h2>
+    ${dbStatus.success ? `
+        <div class="status success">
+            ✅ <strong>CONNESSIONE OK!</strong><br>
+            Tempo server: ${dbStatus.time}<br>
+            PostgreSQL: ${dbStatus.pgVersion}<br>
+            Token stats: ${dbStatus.tokenStats} righe
+        </div>
+    ` : `
+        <div class="status error">
+            ❌ <strong>ERRORE CONNESSIONE:</strong><br>
+            ${dbStatus.error}<br>
+            <small>Verifica DATABASE_URL in Plesk e riavvia l'app</small>
+        </div>
+    `}
+
+    <button onclick="testDb()">🔄 Ritest DB</button>
+    <button onclick="restartApp()">♻️ Refresh Variabili & Restart App</button>
+
+    <script>
+        async function testDb() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Testando...';
+            try {
+                const res = await fetch('/api/test-db');
+                const data = await res.json();
+                location.reload();
+            } catch (error) {
+                alert('Errore: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Ritest DB';
+            }
+        }
+
+        async function restartApp() {
+            if (!confirm('Riavviare l\'app Node.js?\\n\\nLe nuove variabili verranno caricate.')) return;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Riavvio...';
+            try {
+                const res = await fetch('/api/restart-app', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message);
+                setTimeout(() => location.reload(), 2000);
+            } catch (error) {
+                alert('Errore: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
+    `);
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server attivo su porta ${PORT}`);
-    console.log(`🌐 Testa qui: http://mc.bitsans.com:${PORT}`);
+    console.log('🚀 Server su porta ${PORT}');
 });
