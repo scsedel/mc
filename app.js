@@ -86,7 +86,7 @@ app.get('/', async (req, res) => {
     <h2>Test Connessione DB</h2>
     ${dbStatus.success ? `
         <div class="status success">
-            ✅ <strong>CONNESSIONE MOLTO OK!</strong><br>
+            ✅ <strong>CONNESSIONE MOLTO MOLTO OK!</strong><br>
             Tempo server: ${dbStatus.time}<br>
             PostgreSQL: ${dbStatus.pgVersion}<br>
             Token stats: ${dbStatus.tokenStats} righe
