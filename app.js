@@ -98,6 +98,8 @@ app.get('/', async (req, res) => {
             <small>Verifica DATABASE_URL in Plesk e riavvia l'app</small>
         </div>
     `}
+    
+    ${process.env.HELIUS_RPC_URL}
 
     <button id="testBtn">🔄 Ritest DB</button>
     <button id="restartBtn">♻️ Refresh Variabili & Restart App</button>
