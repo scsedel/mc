@@ -9,6 +9,10 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
+// ❌ RIMUOVI QUESTE RIGHE:
+// app.set('view engine', 'ejs');
+// app.set('views', path.join(__dirname, 'views'));
+
 // Pool Supabase
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -53,11 +57,11 @@ app.post('/api/restart-app', (req, res) => {
     }
 });
 
-// Pagina principale HTML puro
+// Pagina principale HTML PURO (NO EJS!)
 app.get('/', async (req, res) => {
     const dbStatus = await testDbConnection();
 
-    res.send(`
+    const html = `
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -99,14 +103,13 @@ app.get('/', async (req, res) => {
         </div>
     `}
 
-    <button onclick="testDb()">🔄 Ritest DB</button>
-    <button onclick="restartApp()">♻️ Refresh Variabili & Restart App</button>
+    <button id="testBtn">🔄 Ritest DB</button>
+    <button id="restartBtn">♻️ Refresh Variabili & Restart App</button>
 
     <script>
-        async function testDb() {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = 'Testando...';
+        document.getElementById('testBtn').addEventListener('click', async function() {
+            this.disabled = true;
+            this.textContent = 'Testando...';
             try {
                 const res = await fetch('/api/test-db');
                 const data = await res.json();
@@ -114,16 +117,15 @@ app.get('/', async (req, res) => {
             } catch (error) {
                 alert('Errore: ' + error.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = '🔄 Ritest DB';
+                this.disabled = false;
+                this.textContent = '🔄 Ritest DB';
             }
-        }
+        });
 
-        async function restartApp() {
-            if (!confirm('Riavviare l\'app Node.js?\\n\\nLe nuove variabili verranno caricate.')) return;
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = 'Riavvio...';
+        document.getElementById('restartBtn').addEventListener('click', async function() {
+            if (!confirm('Riavviare l\\'app Node.js?\\n\\nLe nuove variabili verranno caricate.')) return;
+            this.disabled = true;
+            this.textContent = 'Riavvio...';
             try {
                 const res = await fetch('/api/restart-app', { method: 'POST' });
                 const data = await res.json();
@@ -132,11 +134,12 @@ app.get('/', async (req, res) => {
             } catch (error) {
                 alert('Errore: ' + error.message);
             }
-        }
+        });
     </script>
 </body>
-</html>
-    `);
+</html>`;
+
+    res.send(html);
 });
 
 app.listen(PORT, () => {
