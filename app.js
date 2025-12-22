@@ -14,6 +14,10 @@ const {
 
 const { getDevBalance } = require('./core/devChecker');
 
+// Stato in memoria per i candidati
+let currentCandidates = [];
+let lastFeedUpdate = null;
+
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -226,6 +230,95 @@ app.get('/api/test-dev-balance', async (req, res) => {
             error: error.message,
         });
     }
+});
+
+async function updateCandidatesFeed() {
+    try {
+        console.log('🔄 Aggiornamento feed candidati...');
+
+        // 1) Nuovi token Pump.fun (già filtrati per Age < 1h)
+        const tokens = await testNewPumpfunTokens();
+
+        const results = [];
+
+        for (const t of tokens) {
+            const mint = t.mintAddress;
+            const dev = t.devAddress;
+
+            if (!mint || !dev) continue;
+
+            try {
+                // 2) Statistiche Pump.fun: bonding curve, liquidity, ecc.
+                const stats = await getPumpfunTokenStats(mint);
+
+                // 3) Volume 24h USD
+                const vol = await getPumpfunTokenVolume(mint);
+
+                // 4) Saldo dev
+                const devBalance = await getDevBalance(mint, dev);
+
+                // 5) Applica filtri
+                const bondingCurve = stats.bondingCurveProgress ?? 0;
+                const volume24hUsd = vol.volume24hUsd ?? 0;
+
+                const ageOk = t.ageMinutes != null && t.ageMinutes < 60;
+                const bondingOk = bondingCurve > 95.3;
+                const volumeOk = volume24hUsd > 59000;
+                const devSoldOut = devBalance === 0;
+
+                if (ageOk && bondingOk && volumeOk && devSoldOut) {
+                    results.push({
+                        mint,
+                        name: t.name ?? stats.name,
+                        symbol: t.symbol ?? stats.symbol,
+                        ageMinutes: t.ageMinutes,
+                        devAddress: dev,
+                        bondingCurveProgress: bondingCurve,
+                        volume24hUsd,
+                        devBalance,
+                        // campi extra utili
+                        priceUsd: stats.priceUsd ?? null,
+                        liquidityUsd: stats.liquidityUsd ?? null,
+                        metadataUri: t.metadataUri ?? null,
+                        programAddress: t.programAddress ?? null,
+                    });
+                }
+            } catch (innerErr) {
+                console.error(`Errore valutando token ${mint}:`, innerErr.message);
+                // Continua con il prossimo token
+            }
+        }
+
+        currentCandidates = results;
+        lastFeedUpdate = new Date().toISOString();
+
+        console.log(`✅ Feed aggiornato, candidati: ${currentCandidates.length}`);
+    } catch (error) {
+        console.error('❌ Errore aggiornamento feed candidati:', error.message);
+    }
+}
+
+// Avvia aggiornamento periodico del feed (ogni 30 secondi, ad esempio)
+const FEED_INTERVAL_MS = 5000;
+
+setInterval(() => {
+    updateCandidatesFeed().catch((err) => {
+        console.error('Errore nel loop feed:', err.message);
+    });
+}, FEED_INTERVAL_MS);
+
+// Primo aggiornamento all’avvio
+updateCandidatesFeed().catch((err) => {
+    console.error('Errore primo update feed:', err.message);
+});
+
+app.get('/api/feed-candidates', (req, res) => {
+    res.json({
+        success: true,
+        updatedAt: lastFeedUpdate,
+        count: currentCandidates.length,
+        candidates: currentCandidates,
+    });
 });
 
 app.listen(PORT, () => {
