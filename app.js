@@ -6,6 +6,8 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const { testNewPumpfunTokens } = require('./core/bitqueryClient');
+
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -99,8 +101,6 @@ app.get('/', async (req, res) => {
         </div>
     `}
     
-    ${process.env.HELIUS_RPC_URL}
-
     <button id="testBtn">🔄 Ritest DB</button>
     <button id="restartBtn">♻️ Refresh Variabili & Restart App</button>
 
@@ -139,6 +139,25 @@ app.get('/', async (req, res) => {
 
     res.send(html);
 });
+
+// Test Bitquery: ultimi token Pump.fun
+app.get('/api/test-bitquery', async (req, res) => {
+    try {
+        const tokens = await testNewPumpfunTokens();
+        res.json({
+            success: true,
+            count: tokens.length,
+            tokens,
+        });
+    } catch (error) {
+        console.error('Errore test Bitquery:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log('🚀 Server su porta ${PORT}');
