@@ -47,6 +47,33 @@ const TEST_QUERY = `
   }
 `;
 
+const STATS_QUERY = `
+  query PumpfunTokenStats($mint: String!) {
+    Solana {
+      PumpFunTokens(
+        where: { MintAddress: { is: $mint } }
+        limit: { count: 1 }
+      ) {
+        MintAddress
+        Name
+        Symbol
+        MarketCap {
+          PriceInUSD
+          MarketCapInUSD
+          Volume24hInUSD
+        }
+        Liquidity {
+          LiquidityInUSD
+        }
+        BondingCurve {
+          BondingCurveProgress
+        }
+      }
+    }
+  }
+`;
+
+
 async function testNewPumpfunTokens() {
     const apiToken = process.env.BITQUERY_V2_TOKEN;
 
@@ -104,6 +131,60 @@ async function testNewPumpfunTokens() {
     return tokens;
 }
 
+async function getPumpfunTokenStats(mintAddress) {
+    const apiToken = process.env.BITQUERY_V2_TOKEN;
+    if (!apiToken) {
+        throw new Error('BITQUERY_V2_TOKEN non impostata nelle variabili di ambiente');
+    }
+    if (!mintAddress) {
+        throw new Error('mintAddress è obbligatorio');
+    }
+
+    const response = await fetch(BITQUERY_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({
+            query: STATS_QUERY,
+            variables: { mint: mintAddress },
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Bitquery HTTP ${response.status}: ${text}`);
+    }
+
+    const json = await response.json();
+
+    if (json.errors && json.errors.length) {
+        throw new Error(`Bitquery errors: ${JSON.stringify(json.errors)}`);
+    }
+
+    const token = json.data?.Solana?.PumpFunTokens?.[0];
+    if (!token) {
+        throw new Error('Nessun dato trovato per questo mint (non sembra un token Pump.fun)');
+    }
+
+    const market = token.MarketCap || {};
+    const liq = token.Liquidity || {};
+    const curve = token.BondingCurve || {};
+
+    return {
+        mintAddress: token.MintAddress,
+        name: token.Name,
+        symbol: token.Symbol,
+        priceUsd: market.PriceInUSD ?? null,
+        marketCapUsd: market.MarketCapInUSD ?? null,
+        volume24hUsd: market.Volume24hInUSD ?? null,
+        liquidityUsd: liq.LiquidityInUSD ?? null,
+        bondingCurveProgress: curve.BondingCurveProgress ?? null,
+    };
+}
+
 module.exports = {
     testNewPumpfunTokens,
+    getPumpfunTokenStats,
 };

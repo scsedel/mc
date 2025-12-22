@@ -6,7 +6,7 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { testNewPumpfunTokens } = require('./core/bitqueryClient');
+const { testNewPumpfunTokens, getPumpfunTokenStats } = require('./core/bitqueryClient');
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -158,6 +158,31 @@ app.get('/api/test-bitquery', async (req, res) => {
     }
 });
 
+// Dettagli Pump.fun per un singolo mint
+app.get('/api/test-pumpfun-stats', async (req, res) => {
+    const { mint } = req.query;
+
+    if (!mint) {
+        return res.status(400).json({
+            success: false,
+            error: 'Parametro "mint" mancante. Usa ?mint=<mintAddress>',
+        });
+    }
+
+    try {
+        const stats = await getPumpfunTokenStats(mint.trim());
+        res.json({
+            success: true,
+            stats,
+        });
+    } catch (error) {
+        console.error('Errore test Pumpfun stats:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
 
 app.listen(PORT, () => {
     console.log('🚀 Server su porta ${PORT}');
