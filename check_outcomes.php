@@ -1,55 +1,60 @@
 <?php
+// update_outcomes.php - Cron ogni 5min
+require_once 'db_config.php';  // Il tuo file con global $pdo
 
-// check_outcomes.php - Verifica se hanno raggiunto 25k
-require_once 'db_config.php';
-
-function checkOutcomes()
-{
-    global $pdo;
-
-    // Snapshot da controllare (11k da almeno 30m, senza outcome)
+function updateOutcomes(PDO $pdo) {
     $stmt = $pdo->prepare("
-        SELECT s.id, s.token_id, s.ts, t.address
+        SELECT s.id, s.token_id, s.ts, s.mc_usd
         FROM snapshots s
-        JOIN tokens t ON s.token_id = t.id
-        WHERE s.entered_11k_range = 1 
-        AND s.id NOT IN (SELECT snapshot_id FROM outcomes)
-        AND TIMESTAMPDIFF(MINUTE, s.ts, NOW()) >= 30
-        LIMIT 50  -- batch piccolo
+        LEFT JOIN outcomes o ON o.snapshot_id = s.id
+        WHERE (o.id IS NULL OR o.checked_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE))
+        AND s.entered_11k_range = 1
+        AND s.ts > DATE_SUB(NOW(), INTERVAL 2 HOUR)
+        ORDER BY s.ts ASC
     ");
     $stmt->execute();
-    $snapshots = $stmt->fetchAll();
+    $snapshots = $stmt->fetchAll(PDO::FETCH_ASSOC);  // Dichiarato qui
 
+    $processed = 0;
     foreach ($snapshots as $snap) {
-        $data = checkTokenStatus($snap['address']);
+        $tokenId = $snap['token_id'];
+        $snapTs = $snap['ts'];
 
-        $max_mc_30m = $data['max_mc_usd'] ?? null;
-        $hit_25k_30m = $max_mc_30m >= 25000;
+        $end30m = date('Y-m-d H:i:s', strtotime($snapTs . ' +30 minutes'));
+        $end60m = date('Y-m-d H:i:s', strtotime($snapTs . ' +60 minutes'));
 
-        // Salva outcome
-        $stmt_out = $pdo->prepare("
-            INSERT INTO outcomes (snapshot_id, max_mc_30m, hit_25k_30m, checked_at)
-            VALUES (?, ?, ?, NOW())
+        $max30m = getMaxMcUsd($pdo, $tokenId, $snapTs, $end30m);
+        $max60m = getMaxMcUsd($pdo, $tokenId, $snapTs, $end60m);
+
+        $hit35k30m = $max30m >= 35000 ? 1 : 0;
+        $hit35k60m = $max60m >= 35000 ? 1 : 0;
+
+        $insStmt = $pdo->prepare("
+            INSERT INTO outcomes (snapshot_id, max_mc_usd_30m, max_mc_usd_60m, hit_35k_30m, hit_35k_60m, checked_at, final_status)
+            VALUES (?, ?, ?, ?, ?, NOW(), 'checked')
+            ON DUPLICATE KEY UPDATE
+            max_mc_usd_30m=VALUES(max_mc_usd_30m),
+            max_mc_usd_60m=VALUES(max_mc_usd_60m),
+            hit_35k_30m=VALUES(hit_35k_30m),
+            hit_35k_60m=VALUES(hit_35k_60m),
+            checked_at=NOW()
         ");
-        $stmt_out->execute([$snap['id'], $max_mc_30m, $hit_25k_30m]);
-
-        echo "📊 Snapshot {$snap['id']}: max MC {$max_mc_30m}k USD → " . ($hit_25k_30m ? 'SUCCESS' : 'FAIL') . "\n";
+        $insStmt->execute([$snap['id'], $max30m, $max60m, $hit35k30m, $hit35k60m]);
+        $processed++;
     }
+    return $processed;
 }
 
-function checkTokenStatus($token_address)
-{
-    // Ritorna MC attuale da DexScreener
-    $url = "https://api.dexscreener.com/latest/dex/tokens/{$token_address}";
-    $data = callDexScreener($url);
-
-    $pairs = $data['pairs'] ?? [];
-    if (!empty($pairs)) {
-        return ['max_mc_usd' => $pairs[0]['marketCap'] ?? 0];
-    }
-    return ['max_mc_usd' => 0];
+function getMaxMcUsd(PDO $pdo, int $tokenId, string $startTs, string $endTs): float {
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(MAX(mc_usd), 0) as max_mc
+        FROM snapshots WHERE token_id=? AND ts BETWEEN ? AND ?
+    ");
+    $stmt->execute([$tokenId, $startTs, $endTs]);
+    return (float) $stmt->fetchColumn();
 }
 
 // Esegui
-checkOutcomes();
-
+$processed = updateOutcomes($pdo);
+echo date('Y-m-d H:i:s') . " - Processati: $processed snapshot\n";
+?>

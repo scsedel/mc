@@ -1,4 +1,8 @@
 <?php
+$API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6Ijg3NTE1ZTI2LTExNjEtNDRmMS1iZDJlLTNlNjQ1YmRkNDc4NiIsIm9yZ0lkIjoiNDg5MzAxIiwidXNlcklkIjoiNTAzNDMyIiwidHlwZUlkIjoiZWI0ZTgwOGEtYzAyYy00ZDNhLWI2YjctMGEyYWNjZTA0ZWIxIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njc4ODgzMDIsImV4cCI6NDkyMzY0ODMwMn0.8smuWpUwpZrvYO8QbKctJFZD4_IRqj6sDe5GxMyMEGs';
+
+$HELIUS_RPC = 'https://mainnet.helius-rpc.com/?api-key=b25800c5-948f-42bd-acbf-f81c4bbf240d';
+
 // db_config.php
 $host = 'localhost';
 $dbname = 'mc_fjhd783';
